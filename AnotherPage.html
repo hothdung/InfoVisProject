@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.2.1.js"></script>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <meta charset="UTF-8">
+    <title>AnotherPage</title>
+
+    <style>
+        .row {
+            margin-top: 30px;
+        }
+        [class^='col'], [class*=' col'] {
+            margin-top: 30px;
+        }
+
+        #blockText{
+            border-left: 1.5px solid black;
+        }
+
+
+    </style>
+</head>
+<body>
+<div class="container text-center">
+    <div class="row">
+        <div class="col-md-6" id="rectsBlock">
+            <svg id="barchart"></svg>
+
+        </div>
+        <div class="col-md-6" id="blockText">
+        </div>
+    </div>
+</div>
+</body>
+<script>
+    var textContent, textDiv;
+   textContent = document.createTextNode(localStorage.getItem("fileContent"));
+    textDiv = document.getElementById("blockText");
+
+    // extracting words
+
+   // var engPattern = /\w+/g;
+        var engPattern = /\b[^\d\W]+\b/g;
+
+       //var krPattern = /[\uac00-\ud7af]|[\u1100-\u11ff]|[\u3130-\u318f]|[\ua960-\ua97f]|[\ud7b0-\ud7ff]/g;
+
+        var res = localStorage.getItem("fileContent").match(engPattern);
+
+       // console.log("Sprache"+localStorage.getItem("fileContent").match(krPattern))
+    res.forEach(function (word) {
+        var span = document.createElement('span');
+        span.textContent = word + ' ';
+        span.setAttribute('data-key', word);
+        textDiv.appendChild(span);
+    });
+
+    $('div#blockText span[data-key]').on('mouseover', function (){
+        var key = $(this).data('key');
+        d3.select("#rectsBlock").select("#barchart").select('svg rect[data-key='+key+']').style('fill', 'brown');
+    }).on('mouseout', function (){
+        var key = $(this).data('key');
+        d3.select("#rectsBlock").select("#barchart").select('svg rect[data-key='+key+']').style('fill', '#1bf0c0');
+    }).on('click', function (){
+        console.log("Clicked word: " + $(this).data('key'));
+    });
+
+        // extracting unique words and feed into array
+        var unique = res.reduce((result, element) => {
+            var normalize = function(x) { return typeof x === 'string' ? x.toLowerCase() : x; };
+
+            var normalizedElement = normalize(element);
+            if (result.every(otherElement => normalize(otherElement) !== normalizedElement))
+                result.push(element);
+
+            return result;
+        }, []);
+
+
+        function removeOneLetterElem(arr){
+            var index = 0;
+            for(var i = 0;i<arr.length;i++){
+                if(arr[i].length ===1 && arr[i]!=="a"){
+                    console.log("Wert ist "+arr[i]);
+                    index = arr.indexOf(arr[i]);
+                    console.log(index);
+                    arr.splice(index,1);
+                }
+            }
+        }
+       removeOneLetterElem(unique);
+
+        console.log(unique);
+
+        //function distinguishLang(lang){
+        //}
+
+    console.log("Value is"+document.getElementsByClassName("bar").textContent);
+
+    // percentages
+
+    var arrNums = [];
+
+    generatePercentages();
+    function generatePercentages(){
+        var arr = [];
+
+        for(var i = 0;i<unique.length;i++){
+            arr.push(Math.floor((Math.random()*100) + 1));
+        }
+        arrNums = arr;
+    }
+
+
+    // building json
+
+    var jsonData;
+    var wordset ={};
+
+    function buildJson(){
+        var words = [];
+        var word, val, wordElem;
+
+        wordset.words = words;
+        for(var i=0;i<unique.length;i++){
+        word = unique[i];
+        val = arrNums[i];
+        wordElem={
+            "word":word,
+            "value":val
+        };
+
+        wordset.words.push(wordElem);
+        }
+        jsonData = JSON.stringify(wordset);
+    }
+
+    buildJson();
+        // bar chars
+   console.log(wordset.words);
+
+
+    var margin = {top: 5, right: 80, bottom: 30, left: 90},
+        width = 600- margin.left - margin.right,
+        height = 1500 - margin.top - margin.bottom;
+
+    var svg = d3.select("#rectsBlock").select("#barchart")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom);
+
+    var x = d3.scaleLinear().range([0,width]);
+    var y = d3.scaleBand().range([height,0]);
+
+    var g =  svg.append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    wordset.words.sort(function(a,b){
+        return a.value-b.value;
+    });
+    x.domain([0, d3.max(wordset.words, function(d){
+        return d.value;})]);
+    y.domain(wordset.words.map(function(d){
+       return d.word;
+    })).padding(0.2);
+
+    g.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")");
+
+    g.append("g")
+        .attr("class", "y axis")
+        .call(d3.axisLeft(y).tickSize(0));
+
+
+   var bars = g.selectAll(".bar")
+        .data(wordset.words)
+        .enter()
+        .append("rect")
+        .attr("class","bar")
+        .attr("x",0)
+        .attr("height",y.bandwidth())
+        .attr("y", function(d) { return y(d.word); });
+
+        bars.transition()
+        .duration(50)
+        .delay(function (d, i) {
+            return i * 20;
+        })
+        .attr("width", function(d){
+            return x(d.value);
+        })
+        .attr("fill","#1bf0c0");
+
+
+        g.selectAll(".text")
+        .data(wordset.words)
+        .enter()
+        .append("text")
+        .transition()
+        .duration(50)
+        .delay(function (d, i) {
+            return i * 20;
+        })
+        .attr("class","label")
+         .attr("y",function(d){
+            return y(d.word)+y.bandwidth()-1;
+        })
+        .attr("x",function(d){
+            return x(d.value)+3;
+        })
+        .attr("dy",".12em")
+        .style("font-size", "11px")
+        .text(function(d){
+            return d.value+"%";
+    });
+
+    bars.attr("id",function(d,i){
+        return i;})
+        .attr('data-key', function (d) { return d.word; })
+        .on("mouseover",function(d){
+            console.log("Printing words "+d.word);
+                d3.select(this)
+                    .style("fill", "brown")
+
+        }).on("mouseout",function(d,i){
+            d3.select(this).style("fill","#1bf0c0");
+        });
+
+
+</script>
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/js/bootstrap.min.js" integrity="sha384-ChfqqxuZUCnJSK3+MXmPNIyE6ZbWh2IMqE241rYiqJxyMiZ6OW/JmZQ5stwEULTy" crossorigin="anonymous"></script>
+</body>
+</html>
